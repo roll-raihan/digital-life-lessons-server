@@ -51,8 +51,45 @@ async function run() {
         })
 
         app.patch('/lessons/:id', async (req, res) => {
+            const id = req.params.id;
+            const updatedData = req.body;
 
+            const query = { _id: new ObjectId(id) };
+
+            const updatedDoc = {
+                $set: updatedData
+            }
+
+            const result = await lessonsCollections.updateOne(query, updatedDoc);
+            res.send(result);
         })
+
+        // app.patch('/lessons/:id', async (req, res) => {
+        //     try {
+        //         const id = req.params.id;
+        //         const updatedData = req.body;
+
+        //         // Validate ObjectId
+        //         if (!ObjectId.isValid(id)) {
+        //             return res.status(400).json({ message: "Invalid lesson ID" });
+        //         }
+
+        //         const query = { _id: new ObjectId(id) };
+        //         const updatedDoc = { $set: updatedData };
+
+        //         const result = await lessonsCollections.updateOne(query, updatedDoc);
+
+        //         if (result.matchedCount === 0) {
+        //             return res.status(404).json({ message: "Lesson not found" });
+        //         }
+
+        //         res.json({ message: "Lesson updated successfully", result });
+        //     } catch (error) {
+        //         console.error("PATCH /lessons error:", error);
+        //         res.status(500).json({ message: "Internal server error", error });
+        //     }
+        // });
+
 
         app.delete('/lessons/:id', async (req, res) => {
             const id = req.params.id;
