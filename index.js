@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const app = express()
 require('dotenv').config()
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const port = process.env.PORT || 3000;
 
 // middleware
@@ -45,12 +45,21 @@ async function run() {
 
         app.post('/lessons', async (req, res) => {
             const lessons = req.body;
+            lessons.createdDate = new Date();
             const result = await lessonsCollections.insertOne(lessons);
             res.send(result)
         })
 
         app.patch('/lessons/:id', async (req, res) => {
 
+        })
+
+        app.delete('/lessons/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+
+            const result = await lessonsCollections.deleteOne(query);
+            res.send(result);
         })
 
         // Send a ping to confirm a successful connection
