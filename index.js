@@ -30,7 +30,17 @@ async function run() {
 
         // lessons related api
         app.get('/lessons', async (req, res) => {
+            const query = {};
+            const { email } = req.query;
 
+            // find by email
+            if (email) {
+                query.email = email
+            }
+
+            const cursor = lessonsCollections.find(query);
+            const result = await cursor.toArray();
+            res.send(result)
         })
 
         app.post('/lessons', async (req, res) => {
