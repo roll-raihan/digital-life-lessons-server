@@ -29,6 +29,7 @@ async function run() {
 
         const db = client.db('life_lessons_db');
         const lessonsCollections = db.collection('lessons');
+        const usersCollections = db.collection('users');
 
         // lessons related api
         app.get('/lessons', async (req, res) => {
@@ -104,6 +105,7 @@ async function run() {
 
         // payment related apis
         app.post('/create-checkout-session', async (req, res) => {
+
             const { paymentInfo, userID } = req.body;
             const session = await stripe.checkout.sessions.create({
                 line_items: [
@@ -121,11 +123,41 @@ async function run() {
                 ],
                 customer_email: paymentInfo.email,
                 mode: 'payment',
-                success_url: `${process.env.SITE_DOMAIN}/payment/success`,
+                success_url: `${process.env.SITE_DOMAIN}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
                 cancel_url: `${process.env.SITE_DOMAIN}/payment/cancel`,
-                metadata: { userId }
+                metadata: { userId: userID }
             })
             res.send({ url: session.url });
+        })
+
+        app.patch('/payment-success', async (req, res) => {
+            const sessionId = req.query.session_id;
+            // console.log('session id', sessionId);
+            if (!sessionId) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Session ID is required'
+                });
+            }
+            const session = await stripe.checkout.sessions.retrieve(sessionId);
+            console.log('session retrieve', session);
+
+            if (session.payment_status === 'paid') {
+                const id = session.metadata.userId;
+                const query = { _id: new ObjectId(id) };
+                const update = {
+                    $set: {
+                        paymentStatus: 'paid',
+                        isPremium: true,
+                        paidAt: new Date(),
+                        stripeSessionId: sessionId
+                    }
+                }
+                const result = await lessonsCollections.updateOne(query, update);
+                res.send(result)
+            }
+
+            res.send({ success: false })
         })
 
         // Send a ping to confirm a successful connection
