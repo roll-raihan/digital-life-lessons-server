@@ -3,6 +3,8 @@ const cors = require('cors');
 const app = express()
 require('dotenv').config()
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const stripe = require('stripe')(process.env.STRIPE_SECRET);
+
 const port = process.env.PORT || 3000;
 
 // middleware
@@ -50,6 +52,7 @@ async function run() {
             res.send(result)
         })
 
+        // not finished and didn't work
         app.patch('/lessons/:id', async (req, res) => {
             const id = req.params.id;
             const updatedData = req.body;
@@ -97,6 +100,32 @@ async function run() {
 
             const result = await lessonsCollections.deleteOne(query);
             res.send(result);
+        })
+
+        // payment related apis
+        app.post('/create-checkout-session', async (req, res) => {
+            const { paymentInfo, userID } = req.body;
+            const session = await stripe.checkout.sessions.create({
+                line_items: [
+                    {
+                        // Provide the exact Price ID (for example, price_1234) of the product you want to sell
+                        price_data: {
+                            currency: 'BDT',
+                            product_data: {
+                                name: 'Premium Lifetime Access',
+                            },
+                            unit_amount: 150000
+                        },
+                        quantity: 1,
+                    },
+                ],
+                customer_email: paymentInfo.email,
+                mode: 'payment',
+                success_url: `${process.env.SITE_DOMAIN}/payment/success`,
+                cancel_url: `${process.env.SITE_DOMAIN}/payment/cancel`,
+                metadata: { userId }
+            })
+            res.send({ url: session.url });
         })
 
         // Send a ping to confirm a successful connection
