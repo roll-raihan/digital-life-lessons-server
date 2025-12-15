@@ -7,9 +7,39 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET);
 
 const port = process.env.PORT || 3000;
 
+const admin = require("firebase-admin");
+
+const serviceAccount = require("./digital-life-lessons-firebase-adminsdk.json");
+
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+});
+
+
 // middleware
 app.use(express.json());
 app.use(cors());
+
+const verifyFBToken = async (req, res, next) => {
+
+    const token = req.headers?.authorization;
+
+    if (!token) {
+        return res.status(401).send({ message: 'unauthorized access' })
+    }
+
+    try {
+        const idToken = token.split(' ')[1];
+        const decoded = await admin.auth().verifyIdToken(idToken);
+        console.log('decoded id token', decoded);
+        req.decoded_email = decoded.email;
+        next();
+    }
+    catch (err) {
+        return res.status(401).send({ message: 'unauthorized access' });
+    }
+
+}
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.n2kdiwk.mongodb.net/?appName=Cluster0`;
 
@@ -30,6 +60,24 @@ async function run() {
         const db = client.db('life_lessons_db');
         const lessonsCollections = db.collection('lessons');
         const usersCollections = db.collection('users');
+
+        // users related api
+        app.post('/users', async (req, res) => {
+            const user = req.body;
+            user.role = 'user';
+            user.createdAt = new Date();
+            user.isPremium = false;
+
+            const email = user?.email;
+
+            const userExist = await usersCollections.findOne({ email });
+            if (userExist) {
+                return res.send({ message: 'user exist' })
+            }
+
+            const result = await usersCollections.insertOne(user);
+            res.send(result);
+        })
 
         // lessons related api
         app.get('/lessons', async (req, res) => {
@@ -132,7 +180,7 @@ async function run() {
 
         app.patch('/payment-success', async (req, res) => {
             const sessionId = req.query.session_id;
-            // console.log('session id', sessionId);
+            console.log('session id', sessionId);
             if (!sessionId) {
                 return res.status(400).json({
                     success: false,
@@ -140,10 +188,14 @@ async function run() {
                 });
             }
             const session = await stripe.checkout.sessions.retrieve(sessionId);
-            console.log('session retrieve', session);
+            console.log('🟢 Session retrieved:', {
+                id: session.id,
+                payment_status: session.payment_status,
+                userId: session.metadata?.userId
+            });
 
             if (session.payment_status === 'paid') {
-                const id = session.metadata.userId;
+                const id = session.metadata?.userId;
                 const query = { _id: new ObjectId(id) };
                 const update = {
                     $set: {
