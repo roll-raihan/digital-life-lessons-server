@@ -114,33 +114,52 @@ async function run() {
         app.get('/lessons/:id', async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) }
-            const result =await lessonsCollections.findOne(query);
+            const result = await lessonsCollections.findOne(query);
             res.send(result)
         })
 
         app.post('/lessons', async (req, res) => {
             const lessons = req.body;
             lessons.createdDate = new Date();
-            lessons.reactions=0;
-            lessons.saves=0;
+            lessons.reactions = 0;
+            lessons.saves = 0;
             const result = await lessonsCollections.insertOne(lessons);
             res.send(result)
         })
 
         // not finished and didn't work
-        app.patch('/lessons/:id', async (req, res) => {
+        app.patch('/lessons/:id', verifyFBToken, async (req, res) => {
             const id = req.params.id;
+            const email = req.user.email;
             const updatedData = req.body;
 
-            const query = { _id: new ObjectId(id) };
+            const lesson = await lessonsCollections.findOne({
+                _id: new ObjectId(id)
+            });
 
-            const updatedDoc = {
-                $set: updatedData
+            if (!lesson) return res.status(404).send({ message: 'Not found' });
+
+            // Owner check
+            if (lesson.email !== email) {
+                return res.status(403).send({ message: 'Forbidden' });
             }
 
-            const result = await lessonsCollections.updateOne(query, updatedDoc);
+            // Premium rule
+            if (
+                updatedData.accessLevel === 'premium' &&
+                !req.user.isPremium
+            ) {
+                return res.status(403).send({ message: 'Premium required' });
+            }
+
+            const result = await lessonsCollections.updateOne(
+                { _id: new ObjectId(id) },
+                { $set: updatedData }
+            );
+
             res.send(result);
-        })
+        });
+
 
         // app.patch('/lessons/:id', async (req, res) => {
         //     try {
