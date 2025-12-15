@@ -62,6 +62,23 @@ async function run() {
         const usersCollections = db.collection('users');
 
         // users related api
+        app.get('/users',  async (req, res) => {
+            // verifyFBToken,it should be added ************
+            // const searchText = req.query.searchText;
+            const query = {};
+            // if (searchText) {
+            //     // query.displayName = { $regex: searchText, $options: 'i' }
+            //     query.$or = [
+            //         { displayName: { $regex: searchText, $options: 'i' } },
+            //         { email: { $regex: searchText, $options: 'i' } },
+            //         { role: { $regex: searchText, $options: 'i' } },
+            //     ]
+            // }
+            const cursor = usersCollections.find(query);
+            // .sort({ createdAt: 1 }).limit(5);
+            const result = await cursor.toArray();
+            res.send(result);
+        })
         app.post('/users', async (req, res) => {
             const user = req.body;
             user.role = 'user';
