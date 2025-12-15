@@ -62,8 +62,8 @@ async function run() {
         const usersCollections = db.collection('users');
 
         // users related api
-        app.get('/users',  async (req, res) => {
-            // verifyFBToken,it should be added ************
+        app.get('/users', async (req, res) => {
+            // verifyFBToken ,  it should be added ************
             // const searchText = req.query.searchText;
             const query = {};
             // if (searchText) {
@@ -111,9 +111,18 @@ async function run() {
             res.send(result)
         })
 
+        app.get('/lessons/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) }
+            const result =await lessonsCollections.findOne(query);
+            res.send(result)
+        })
+
         app.post('/lessons', async (req, res) => {
             const lessons = req.body;
             lessons.createdDate = new Date();
+            lessons.reactions=0;
+            lessons.saves=0;
             const result = await lessonsCollections.insertOne(lessons);
             res.send(result)
         })
