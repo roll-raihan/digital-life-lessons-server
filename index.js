@@ -62,8 +62,8 @@ async function run() {
         const usersCollections = db.collection('users');
 
         // users related api
-        app.get('/users', async (req, res) => {
-            // verifyFBToken ,  it should be added ************
+        app.get('/users', verifyFBToken, async (req, res) => {
+            //   it should be added ************
             // const searchText = req.query.searchText;
             const query = {};
             // if (searchText) {
@@ -200,30 +200,41 @@ async function run() {
                 mode: 'payment',
                 success_url: `${process.env.SITE_DOMAIN}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
                 cancel_url: `${process.env.SITE_DOMAIN}/payment/cancel`,
-                metadata: { userId: userID }
+                metadata: { userId: userID.toString() }
             })
             res.send({ url: session.url });
         })
 
         app.patch('/payment-success', async (req, res) => {
-            const sessionId = req.query.session_id;
-            console.log('session id', sessionId);
-            if (!sessionId) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Session ID is required'
-                });
-            }
-            const session = await stripe.checkout.sessions.retrieve(sessionId);
-            console.log('🟢 Session retrieved:', {
-                id: session.id,
-                payment_status: session.payment_status,
-                userId: session.metadata?.userId
-            });
+            try {
+                const sessionId = req.query.session_id;
 
-            if (session.payment_status === 'paid') {
-                const id = session.metadata?.userId;
-                const query = { _id: new ObjectId(id) };
+                if (!sessionId) {
+                    return res.status(400).json({
+                        success: false,
+                        error: 'Session ID is required'
+                    });
+                }
+
+                const session = await stripe.checkout.sessions.retrieve(sessionId);
+                
+                if (session.payment_status !== 'paid') {
+                    return res.status(400).json({
+                        success: false,
+                        error: 'Payment not completed'
+                    });
+                }
+
+                const userId = session.metadata?.userId;
+
+                if (!userId) {
+                    return res.status(400).json({
+                        success: false,
+                        error: 'User ID missing in session metadata'
+                    });
+                }
+
+                const query = { _id: new ObjectId(userId) };
                 const update = {
                     $set: {
                         paymentStatus: 'paid',
@@ -231,13 +242,25 @@ async function run() {
                         paidAt: new Date(),
                         stripeSessionId: sessionId
                     }
-                }
-                const result = await usersCollections.updateOne(query, update);
-                res.send(result)
-            }
+                };
 
-            res.send({ success: false })
-        })
+                const result = await usersCollections.updateOne(query, update);
+
+                return res.send({
+                    success: true,
+                    message: 'Payment verified and user upgraded',
+                    result
+                });
+
+            } catch (error) {
+                console.error('Stripe verification error:', error);
+                res.status(500).json({
+                    success: false,
+                    error: 'Server error verifying payment'
+                });
+            }
+        });
+
 
         // Send a ping to confirm a successful connection
         await client.db("admin").command({ ping: 1 });
