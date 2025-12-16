@@ -127,27 +127,37 @@ async function run() {
             res.send(result)
         })
 
-        // not finished and didn't work
+        // not finished and didn't work properly
         app.patch('/lessons/:id', verifyFBToken, async (req, res) => {
             const id = req.params.id;
-            const email = req.user.email;
             const updatedData = req.body;
+            // console.log('updated data: ', updatedData)
+            // console.log('id Id: ', id)
+            const emailFromToken = req.decoded_email;
 
             const lesson = await lessonsCollections.findOne({
                 _id: new ObjectId(id)
             });
 
-            if (!lesson) return res.status(404).send({ message: 'Not found' });
+            if (!lesson) return res.status(404).send({ message: 'Lesson not found' });
 
             // Owner check
-            if (lesson.email !== email) {
-                return res.status(403).send({ message: 'Forbidden' });
+            if (lesson.email !== emailFromToken) {
+                return res.status(403).send({ message: 'Forbidden: not owner' });
+            }
+
+            // actual user exist or not
+            const user = await usersCollections.findOne({
+                email: emailFromToken
+            })
+            if (!user) {
+                return res.status(401).send({ message: 'User not found' });
             }
 
             // Premium rule
             if (
-                updatedData.accessLevel === 'premium' &&
-                !req.user.isPremium
+                updatedData?.accessLevel === 'premium' &&
+                !user?.isPremium
             ) {
                 return res.status(403).send({ message: 'Premium required' });
             }
@@ -159,34 +169,6 @@ async function run() {
 
             res.send(result);
         });
-
-
-        // app.patch('/lessons/:id', async (req, res) => {
-        //     try {
-        //         const id = req.params.id;
-        //         const updatedData = req.body;
-
-        //         // Validate ObjectId
-        //         if (!ObjectId.isValid(id)) {
-        //             return res.status(400).json({ message: "Invalid lesson ID" });
-        //         }
-
-        //         const query = { _id: new ObjectId(id) };
-        //         const updatedDoc = { $set: updatedData };
-
-        //         const result = await lessonsCollections.updateOne(query, updatedDoc);
-
-        //         if (result.matchedCount === 0) {
-        //             return res.status(404).json({ message: "Lesson not found" });
-        //         }
-
-        //         res.json({ message: "Lesson updated successfully", result });
-        //     } catch (error) {
-        //         console.error("PATCH /lessons error:", error);
-        //         res.status(500).json({ message: "Internal server error", error });
-        //     }
-        // });
-
 
         app.delete('/lessons/:id', async (req, res) => {
             const id = req.params.id;
@@ -250,7 +232,7 @@ async function run() {
                         stripeSessionId: sessionId
                     }
                 }
-                const result = await lessonsCollections.updateOne(query, update);
+                const result = await usersCollections.updateOne(query, update);
                 res.send(result)
             }
 
