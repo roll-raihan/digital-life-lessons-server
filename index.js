@@ -106,7 +106,7 @@ async function run() {
                 query.email = email
             }
 
-            const cursor = lessonsCollections.find(query);
+            const cursor = lessonsCollections.find(query).sort({ createdDate: -1 });
             const result = await cursor.toArray();
             res.send(result)
         })
@@ -118,16 +118,40 @@ async function run() {
             res.send(result)
         })
 
-        app.post('/lessons', async (req, res) => {
-            const lessons = req.body;
-            lessons.createdDate = new Date();
-            lessons.reactions = 0;
-            lessons.saves = 0;
-            const result = await lessonsCollections.insertOne(lessons);
+        app.post('/lessons', verifyFBToken, async (req, res) => {
+            const lesson = req.body;
+            const emailFromToken = req.decoded_email;
+
+            const user = await usersCollections.findOne({ email: emailFromToken });
+
+            if (!user) {
+                return res.status(401).send({ message: 'User not found' });
+            }
+
+            if (lesson?.accessLevel === 'premium' && !user?.isPremium) {
+                return res.status(403).send({ message: 'Premium required to create premium lessons' })
+            }
+
+            const newLesson = {
+                ...lesson,
+                email: user.email,
+                creator: {
+                    email: user?.email,
+                    name: user?.displayName,
+                    photoURL: user?.photoURL,
+                },
+                createdDate: new Date(),
+                // updatedDate: new Date(),
+                reactions: 0,
+                saves: 0,
+            };
+
+            delete newLesson._id;
+
+            const result = await lessonsCollections.insertOne(newLesson);
             res.send(result)
         })
 
-        // not finished and didn't work properly
         app.patch('/lessons/:id', verifyFBToken, async (req, res) => {
             const id = req.params.id;
             const updatedData = req.body;
@@ -161,6 +185,8 @@ async function run() {
             ) {
                 return res.status(403).send({ message: 'Premium required' });
             }
+
+            updatedData.updatedDate = new Date();
 
             const result = await lessonsCollections.updateOne(
                 { _id: new ObjectId(id) },
@@ -217,7 +243,7 @@ async function run() {
                 }
 
                 const session = await stripe.checkout.sessions.retrieve(sessionId);
-                
+
                 if (session.payment_status !== 'paid') {
                     return res.status(400).json({
                         success: false,
