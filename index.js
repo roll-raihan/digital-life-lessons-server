@@ -63,7 +63,6 @@ async function run() {
 
         // users related api
         app.get('/users', verifyFBToken, async (req, res) => {
-            //   it should be added ************
             // const searchText = req.query.searchText;
             const query = {};
             // if (searchText) {
@@ -79,6 +78,14 @@ async function run() {
             const result = await cursor.toArray();
             res.send(result);
         })
+
+        app.get('/users/:id', verifyFBToken, async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const result = await usersCollections.findOne(query);
+            res.send(result);
+        })
+
         app.post('/users', async (req, res) => {
             const user = req.body;
             user.role = 'user';
@@ -97,7 +104,7 @@ async function run() {
         })
 
         // lessons related api
-        app.get('/lessons', async (req, res) => {
+        app.get('/lessons', verifyFBToken, async (req, res) => {
             const query = {};
             const { email } = req.query;
 
@@ -111,12 +118,49 @@ async function run() {
             res.send(result)
         })
 
-        app.get('/lessons/:id', async (req, res) => {
+        app.get('/lessons/:id', verifyFBToken, async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) }
             const result = await lessonsCollections.findOne(query);
             res.send(result)
         })
+
+        app.get("/lessons/user/public", async (req, res) => {
+            try {
+                const email = req.query.email;
+                console.log('email received', email)
+
+                if (!email) {
+                    return res.status(400).send({
+                        success: false,
+                        message: "User email is required",
+                    });
+                }
+                console.log("lessonsCollections:", !!lessonsCollections);
+
+                const lessons = await lessonsCollections
+                    .find({
+                        email: email,
+                        lessonAccess: "free",
+                    })
+                    .sort({ createdAt: -1 })
+                    .toArray();
+
+                console.log("Lessons found:", lessons.length);
+
+                res.send({
+                    success: true,
+                    data: lessons,
+                });
+            } catch (error) {
+                console.error("Fetch user public lessons error:", error);
+                res.status(500).send({
+                    success: false,
+                    message: "Failed to fetch lessons",
+                });
+            }
+        });
+
 
         app.post('/lessons', verifyFBToken, async (req, res) => {
             const lesson = req.body;
@@ -142,8 +186,8 @@ async function run() {
                 },
                 createdDate: new Date(),
                 // updatedDate: new Date(),
-                reactions: 0,
-                saves: 0,
+                reactions: 1,
+                saves: 1,
             };
 
             delete newLesson._id;
