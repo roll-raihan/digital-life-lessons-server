@@ -86,8 +86,11 @@ async function run() {
             res.send(result);
         })
 
-        app.get('/users/:email/premium', async (req, res) => {
-
+        app.get('/users/:email/isPremium', async (req, res) => {
+            const email = req.params.email;
+            const query = { email: email };
+            const result = await usersCollections.findOne(query);
+            res.send(result);
         })
 
         app.post('/users', async (req, res) => {
@@ -108,7 +111,7 @@ async function run() {
         })
 
         // lessons related api
-        app.get('/lessons', verifyFBToken, async (req, res) => {
+        app.get('/lessons',  async (req, res) => {
             const query = {};
             const { email } = req.query;
 
@@ -190,8 +193,8 @@ async function run() {
                 },
                 createdDate: new Date(),
                 // updatedDate: new Date(),
-                reactions: 1,
-                saves: 1,
+                reactions: 0,
+                saves: 0,
             };
 
             delete newLesson._id;
