@@ -87,8 +87,8 @@ async function run() {
             //         { role: { $regex: searchText, $options: 'i' } },
             //     ]
             // }
-            const cursor = usersCollections.find(query);
-            // .sort({ createdAt: 1 }).limit(5);
+            const cursor = usersCollections.find(query).sort({ createdAt: 1 });
+            // .limit(5);
             const result = await cursor.toArray();
             res.send(result);
         })
@@ -128,6 +128,27 @@ async function run() {
             }
 
             const result = await usersCollections.insertOne(user);
+            res.send(result);
+        })
+
+        app.patch('/users/:email', verifyFBToken, verifyAdmin, async (req, res) => {
+            const email = req.params.email;
+            const result = await usersCollections.updateOne(
+                { email },
+                {
+                    $set: {
+                        role: 'admin'
+                    }
+                }
+            );
+            res.send(result)
+        })
+
+        app.delete('/users/:id', verifyFBToken, verifyAdmin, async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+
+            const result = await usersCollections.deleteOne(query);
             res.send(result);
         })
 
