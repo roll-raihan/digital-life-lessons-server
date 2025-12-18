@@ -86,6 +86,10 @@ async function run() {
             res.send(result);
         })
 
+        app.get('/users/:email/premium', async (req, res) => {
+
+        })
+
         app.post('/users', async (req, res) => {
             const user = req.body;
             user.role = 'user';
@@ -251,11 +255,10 @@ async function run() {
         // payment related apis
         app.post('/create-checkout-session', async (req, res) => {
 
-            const { paymentInfo, userID } = req.body;
+            const { paymentInfo } = req.body;
             const session = await stripe.checkout.sessions.create({
                 line_items: [
                     {
-                        // Provide the exact Price ID (for example, price_1234) of the product you want to sell
                         price_data: {
                             currency: 'BDT',
                             product_data: {
@@ -268,9 +271,9 @@ async function run() {
                 ],
                 customer_email: paymentInfo.email,
                 mode: 'payment',
-                success_url: `${process.env.SITE_DOMAIN}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-                cancel_url: `${process.env.SITE_DOMAIN}/payment/cancel`,
-                metadata: { userId: userID.toString() }
+                metadata: { userId: paymentInfo?.userId },
+                success_url: `${process.env.SITE_DOMAIN}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+                cancel_url: `${process.env.SITE_DOMAIN}/payment-cancel`
             })
             res.send({ url: session.url });
         })
@@ -280,47 +283,34 @@ async function run() {
                 const sessionId = req.query.session_id;
 
                 if (!sessionId) {
-                    return res.status(400).json({
-                        success: false,
-                        error: 'Session ID is required'
-                    });
+                    return res.status(400).json({ success: false, error: 'Session ID required' });
                 }
 
                 const session = await stripe.checkout.sessions.retrieve(sessionId);
+                // console.log('retrieved', session)
 
                 if (session.payment_status !== 'paid') {
-                    return res.status(400).json({
-                        success: false,
-                        error: 'Payment not completed'
-                    });
+                    return res.status(400).json({ success: false, error: 'Payment not completed' });
                 }
 
-                const userId = session.metadata?.userId;
+                if (session.payment_status === 'paid') {
+                    const email = session.customer_email;
+                    const query = { email: email };
 
-                if (!userId) {
-                    return res.status(400).json({
-                        success: false,
-                        error: 'User ID missing in session metadata'
-                    });
-                }
-
-                const query = { _id: new ObjectId(userId) };
-                const update = {
-                    $set: {
-                        paymentStatus: 'paid',
-                        isPremium: true,
-                        paidAt: new Date(),
-                        stripeSessionId: sessionId
+                    const updatedDoc = {
+                        $set: {
+                            paymentStatus: 'paid',
+                            role: 'premium',
+                            isPremium: true,
+                            paidAt: new Date(),
+                            stripeSessionId: sessionId
+                        }
                     }
-                };
-
-                const result = await usersCollections.updateOne(query, update);
-
-                return res.send({
-                    success: true,
-                    message: 'Payment verified and user upgraded',
-                    result
-                });
+                    const result = await usersCollections.updateOne(
+                        query, updatedDoc
+                    );
+                    res.send(result)
+                }
 
             } catch (error) {
                 console.error('Stripe verification error:', error);
@@ -330,6 +320,7 @@ async function run() {
                 });
             }
         });
+
 
 
         // Send a ping to confirm a successful connection
