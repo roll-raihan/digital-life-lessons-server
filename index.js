@@ -289,6 +289,19 @@ async function run() {
             res.send(result);
         });
 
+        app.patch('/lessons/:id/feature', verifyFBToken, verifyAdmin, async (req, res) => {
+            const id = req.params.id;
+            const result = await lessonsCollections.updateOne(
+                { _id: new ObjectId(id) },
+                {
+                    $set: {
+                        isFeatured: true
+                    }
+                }
+            );
+            res.send(result)
+        })
+
         app.delete('/lessons/:id', async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
