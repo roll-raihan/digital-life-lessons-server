@@ -61,6 +61,20 @@ async function run() {
         const lessonsCollections = db.collection('lessons');
         const usersCollections = db.collection('users');
 
+        // verify admin before allowing admin activity
+        // must use after middleware
+        // middleware with database access
+        const verifyAdmin = async (req, res, next) => {
+            const email = req.decoded_email;
+            const query = { email };
+            const user = await usersCollections.findOne(query);
+
+            if (!user || user?.role !== 'admin') {
+                return res.status(403).send({ message: 'forbidden access' });
+            }
+            next();
+        }
+
         // users related api
         app.get('/users', verifyFBToken, async (req, res) => {
             // const searchText = req.query.searchText;
@@ -93,6 +107,13 @@ async function run() {
             res.send(result);
         })
 
+        app.get('/users/:email/role', verifyFBToken, verifyAdmin, async (req, res) => {
+            const email = req.params.email;
+            const query = { email: email };
+            const user = await usersCollections.findOne(query);
+            res.send({ role: user?.role || 'user' });
+        })
+
         app.post('/users', async (req, res) => {
             const user = req.body;
             user.role = 'user';
@@ -111,7 +132,7 @@ async function run() {
         })
 
         // lessons related api
-        app.get('/lessons',  async (req, res) => {
+        app.get('/lessons', async (req, res) => {
             const query = {};
             const { email } = req.query;
 
@@ -303,7 +324,6 @@ async function run() {
                     const updatedDoc = {
                         $set: {
                             paymentStatus: 'paid',
-                            role: 'premium',
                             isPremium: true,
                             paidAt: new Date(),
                             stripeSessionId: sessionId
@@ -323,8 +343,6 @@ async function run() {
                 });
             }
         });
-
-
 
         // Send a ping to confirm a successful connection
         await client.db("admin").command({ ping: 1 });
