@@ -155,11 +155,23 @@ async function run() {
         // lessons related api
         app.get('/lessons', async (req, res) => {
             const query = {};
-            const { email } = req.query;
+            const { searchText, category, emotion, email } = req.query;
 
             // find by email
             if (email) {
                 query.email = email
+            }
+
+            if (searchText) {
+                query.lessonTitle = { $regex: searchText, $options: 'i' };
+            }
+
+            if (category) {
+                query.lessonCategory = { $regex: category, $options: 'i' };
+            }
+
+            if (emotion) {
+                query.lessonEmotion = { $regex: emotion, $options: 'i' };
             }
 
             const cursor = lessonsCollections.find(query).sort({ createdDate: -1 });
