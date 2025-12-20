@@ -297,16 +297,42 @@ async function run() {
         // not ideal method for reaction and save, like, anybody can like twice or more
         app.patch('/lessons/:id/reaction', async (req, res) => {
             const id = req.params.id;
+            const { userId } = req.body;
+            console.log('body', req.body)
             const query = { _id: new ObjectId(id) };
-            const update = {
-                $inc: {
-                    reactions: 1,
-                }
+
+            const lesson = await lessonsCollections.findOne(query);
+            if (!lesson) {
+                return res.status(404).send({ message: 'Lesson not found' });
             }
+
+            const alreadyLiked = lesson?.likes?.includes(userId);
+            console.log('already liked', alreadyLiked)
+
+            let update;
+
+            if (alreadyLiked) {
+                // Unlike
+                update = {
+                    $pull: { likes: userId },
+                    $inc: { reactions: -1 }
+                };
+            } else {
+                // Like
+                update = {
+                    $addToSet: { likes: userId },
+                    $inc: { reactions: 1 }
+                };
+            }
+
             const result = await lessonsCollections.updateOne(query, update);
-            res.send(result)
+            res.send({
+                modifiedCount: result.modifiedCount,
+                action: alreadyLiked ? 'disliked' : 'liked'
+            });
+
         })
-        
+
         app.patch('/lessons/:id/save', async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
