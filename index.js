@@ -294,6 +294,31 @@ async function run() {
             res.send(result);
         });
 
+        // not ideal method for reaction and save, like, anybody can like twice or more
+        app.patch('/lessons/:id/reaction', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const update = {
+                $inc: {
+                    reactions: 1,
+                }
+            }
+            const result = await lessonsCollections.updateOne(query, update);
+            res.send(result)
+        })
+        
+        app.patch('/lessons/:id/save', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const update = {
+                $inc: {
+                    saves: 1,
+                }
+            }
+            const result = await lessonsCollections.updateOne(query, update);
+            res.send(result)
+        })
+
         app.patch('/lessons/:id/feature', verifyFBToken, verifyAdmin, async (req, res) => {
             const id = req.params.id;
             const result = await lessonsCollections.updateOne(
