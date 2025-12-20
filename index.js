@@ -60,6 +60,7 @@ async function run() {
         const db = client.db('life_lessons_db');
         const lessonsCollections = db.collection('lessons');
         const usersCollections = db.collection('users');
+        const lessonsReportsCollection = db.collection('reports');
 
         // verify admin before allowing admin activity
         // must use after middleware
@@ -248,6 +249,62 @@ async function run() {
 
             const result = await lessonsCollections.insertOne(newLesson);
             res.send(result)
+        })
+
+        app.post('/lessons/report', verifyFBToken, async (req, res) => {
+            try {
+                const { lessonId, reporterUserId, reporterEmail, reason } = req.body;
+                if (!lessonId || !reporterUserId || !reason) {
+                    return res.status(400).send({ message: 'Missing required fields' });
+                }
+
+                const lessonQuery = { _id: new ObjectId(lessonId) };
+                const lesson = await lessonsCollections.findOne(lessonQuery);
+                if (!lesson) {
+                    res.status(404).send({
+                        message: 'Lesson not found'
+                    })
+                }
+
+                const duplicateQuery = {
+                    lessonId: lessonId,
+                    reporterUserId: reporterUserId
+                };
+                const alreadyReported = await lessonsReportsCollection.findOne(duplicateQuery);
+                if (alreadyReported) {
+                    return res.send({ message: 'already-reported' });
+                }
+
+                const allowedReasons = [
+                    'Inappropriate Content',
+                    'Hate Speech or Harassment',
+                    'Misleading or False Information',
+                    'Spam or Promotional Content',
+                    'Sensitive or Disturbing Content',
+                    'Other'
+                ];
+
+                if (!allowedReasons.includes(reason)) {
+                    return res.status(400).send({ message: 'Invalid report reason' });
+                }
+
+                const reportDoc = {
+                    lessonId: lessonId,
+                    reporterUserId: reporterUserId,
+                    reporterEmail: reporterEmail || null,
+                    reason,
+                    createdAt: new Date(),
+                    status: 'pending'
+                };
+
+                const result = await lessonsReportsCollection.insertOne(reportDoc);
+
+                res.send(result);
+            }
+            catch (error) {
+                console.error('Report lesson error:', error);
+                res.status(500).send({ message: 'Internal server error' });
+            }
         })
 
         app.patch('/lessons/:id', verifyFBToken, async (req, res) => {
