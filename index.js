@@ -294,11 +294,9 @@ async function run() {
             res.send(result);
         });
 
-        // not ideal method for reaction and save, like, anybody can like twice or more
         app.patch('/lessons/:id/reaction', async (req, res) => {
             const id = req.params.id;
             const { userId } = req.body;
-            console.log('body', req.body)
             const query = { _id: new ObjectId(id) };
 
             const lesson = await lessonsCollections.findOne(query);
@@ -307,7 +305,6 @@ async function run() {
             }
 
             const alreadyLiked = lesson?.likes?.includes(userId);
-            console.log('already liked', alreadyLiked)
 
             let update;
 
@@ -335,14 +332,37 @@ async function run() {
 
         app.patch('/lessons/:id/save', async (req, res) => {
             const id = req.params.id;
+            const { userEmail } = req.body;
             const query = { _id: new ObjectId(id) };
-            const update = {
-                $inc: {
-                    saves: 1,
-                }
+
+            const lesson = await lessonsCollections.findOne(query);
+            if (!lesson) {
+                return res.status(404).send({ message: 'Lesson not found' });
             }
+
+            const alreadySaved = lesson?.saved?.includes(userEmail);
+
+            let update;
+
+            if (alreadySaved) {
+                // UnSave
+                update = {
+                    $pull: { saved: userEmail },
+                    $inc: { saves: -1 }
+                };
+            } else {
+                // Save
+                update = {
+                    $addToSet: { saved: userEmail },
+                    $inc: { saves: 1 }
+                };
+            }
+
             const result = await lessonsCollections.updateOne(query, update);
-            res.send(result)
+            res.send({
+                modifiedCount: result.modifiedCount,
+                action: alreadySaved ? 'unsaved' : 'saved'
+            })
         })
 
         app.patch('/lessons/:id/feature', verifyFBToken, verifyAdmin, async (req, res) => {
