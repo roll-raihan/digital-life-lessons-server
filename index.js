@@ -77,16 +77,9 @@ async function run() {
 
         // users related api
         app.get('/users', verifyFBToken, async (req, res) => {
-            // const searchText = req.query.searchText;
+
             const query = {};
-            // if (searchText) {
-            //     // query.displayName = { $regex: searchText, $options: 'i' }
-            //     query.$or = [
-            //         { displayName: { $regex: searchText, $options: 'i' } },
-            //         { email: { $regex: searchText, $options: 'i' } },
-            //         { role: { $regex: searchText, $options: 'i' } },
-            //     ]
-            // }
+
             const cursor = usersCollections.find(query).sort({ createdAt: 1 });
             // .limit(5);
             const result = await cursor.toArray();
@@ -308,6 +301,19 @@ async function run() {
                 {
                     $set: {
                         isFeatured: true
+                    }
+                }
+            );
+            res.send(result)
+        })
+
+        app.patch('/lessons/:id/review', verifyFBToken, verifyAdmin, async (req, res) => {
+            const id = req.params.id;
+            const result = await lessonsCollections.updateOne(
+                { _id: new ObjectId(id) },
+                {
+                    $set: {
+                        isReviewed: true
                     }
                 }
             );
