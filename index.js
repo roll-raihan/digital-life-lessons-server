@@ -482,8 +482,16 @@ async function run() {
             }
         })
 
+        app.delete('/reports/:id', verifyFBToken, verifyAdmin, async (req, res) => {
+            const id = req.params.id;
+            const query = { lessonId: new ObjectId(id) };
 
-        // reported lessons
+            const result = await lessonsReportsCollection.deleteOne(query);
+            res.send(result);
+        })
+
+
+        // reported lessons data filter from lessons
         app.get('/reported-lessons', async (req, res) => {
             const result = await lessonsReportsCollection.aggregate([
                 {
