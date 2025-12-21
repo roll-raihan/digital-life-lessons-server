@@ -76,6 +76,7 @@ async function run() {
             next();
         }
 
+
         // users related api
         app.get('/users', verifyFBToken, async (req, res) => {
 
@@ -145,6 +146,7 @@ async function run() {
             const result = await usersCollections.deleteOne(query);
             res.send(result);
         })
+
 
         // lessons related api
         app.get('/lessons', async (req, res) => {
@@ -216,7 +218,6 @@ async function run() {
             }
         });
 
-
         app.post('/lessons', verifyFBToken, async (req, res) => {
             const lesson = req.body;
             const emailFromToken = req.decoded_email;
@@ -249,62 +250,6 @@ async function run() {
 
             const result = await lessonsCollections.insertOne(newLesson);
             res.send(result)
-        })
-
-        app.post('/lessons/report', verifyFBToken, async (req, res) => {
-            try {
-                const { lessonId, reporterUserId, reporterEmail, reason } = req.body;
-                if (!lessonId || !reporterUserId || !reason) {
-                    return res.status(400).send({ message: 'Missing required fields' });
-                }
-
-                const lessonQuery = { _id: new ObjectId(lessonId) };
-                const lesson = await lessonsCollections.findOne(lessonQuery);
-                if (!lesson) {
-                    res.status(404).send({
-                        message: 'Lesson not found'
-                    })
-                }
-
-                const duplicateQuery = {
-                    lessonId: lessonId,
-                    reporterUserId: reporterUserId
-                };
-                const alreadyReported = await lessonsReportsCollection.findOne(duplicateQuery);
-                if (alreadyReported) {
-                    return res.send({ message: 'already-reported' });
-                }
-
-                const allowedReasons = [
-                    'Inappropriate Content',
-                    'Hate Speech or Harassment',
-                    'Misleading or False Information',
-                    'Spam or Promotional Content',
-                    'Sensitive or Disturbing Content',
-                    'Other'
-                ];
-
-                if (!allowedReasons.includes(reason)) {
-                    return res.status(400).send({ message: 'Invalid report reason' });
-                }
-
-                const reportDoc = {
-                    lessonId: lessonId,
-                    reporterUserId: reporterUserId,
-                    reporterEmail: reporterEmail || null,
-                    reason,
-                    createdAt: new Date(),
-                    status: 'pending'
-                };
-
-                const result = await lessonsReportsCollection.insertOne(reportDoc);
-
-                res.send(result);
-            }
-            catch (error) {
-                console.error('Report lesson error:', error);
-                res.status(500).send({ message: 'Internal server error' });
-            }
         })
 
         app.patch('/lessons/:id', verifyFBToken, async (req, res) => {
@@ -456,6 +401,81 @@ async function run() {
             res.send(result);
         })
 
+
+        // report related api
+        app.get('/reports', verifyFBToken, verifyAdmin, async (req, res) => {
+            try {
+                const query = {};
+                const cursor = lessonsReportsCollection.find(query);
+                const result = await cursor.toArray();
+                res.send(result);
+            } catch (error) {
+                console.error('Error fetching lesson reports:', error);
+                res.status(500).json({ error: 'Failed to fetch lesson reports' });
+            }
+        })
+
+        // report for lesson
+        app.post('/reports', verifyFBToken, async (req, res) => {
+            try {
+                const { lessonId, reporterUserId, reporterEmail, reason } = req.body;
+                if (!lessonId || !reporterUserId || !reason) {
+                    return res.status(400).send({ message: 'Missing required fields' });
+                }
+
+                // search if lesson exist
+                const lessonQuery = { _id: new ObjectId(lessonId) };
+                const lesson = await lessonsCollections.findOne(lessonQuery);
+                if (!lesson) {
+                    res.status(404).send({
+                        message: 'Lesson not found'
+                    })
+                }
+
+                // search if user already reported existing lesson
+                const duplicateQuery = {
+                    lessonId: lessonId,
+                    reporterUserId: reporterUserId
+                };
+                const alreadyReported = await lessonsReportsCollection.findOne(duplicateQuery);
+                if (alreadyReported) {
+                    return res.send({ message: 'already-reported' });
+                }
+
+                // all the reason
+                const allowedReasons = [
+                    'Inappropriate Content',
+                    'Hate Speech or Harassment',
+                    'Misleading or False Information',
+                    'Spam or Promotional Content',
+                    'Sensitive or Disturbing Content',
+                    'Other'
+                ];
+
+                if (!allowedReasons.includes(reason)) {
+                    return res.status(400).send({ message: 'Invalid report reason' });
+                }
+
+                const reportDoc = {
+                    lessonId: lessonId,
+                    reporterUserId: reporterUserId,
+                    reporterEmail: reporterEmail || null,
+                    reason,
+                    createdAt: new Date(),
+                    status: 'pending'
+                };
+
+                const result = await lessonsReportsCollection.insertOne(reportDoc);
+
+                res.send(result);
+            }
+            catch (error) {
+                console.error('Report lesson error:', error);
+                res.status(500).send({ message: 'Internal server error' });
+            }
+        })
+
+        
         // payment related apis
         app.post('/create-checkout-session', async (req, res) => {
 
