@@ -482,6 +482,19 @@ async function run() {
             }
         })
 
+        app.patch('/reports/:id', verifyFBToken, verifyAdmin, async (req, res) => {
+            const id = req.params.id;
+            const query = { lessonId: new ObjectId(id) };
+
+            const update = {
+                $set: {
+                    status: 'ignored'
+                }
+            }
+            const result = await lessonsReportsCollection.updateOne(query, update);
+            res.send(result);
+        })
+
         app.delete('/reports/:id', verifyFBToken, verifyAdmin, async (req, res) => {
             const id = req.params.id;
             const query = { lessonId: new ObjectId(id) };
