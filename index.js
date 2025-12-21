@@ -175,6 +175,13 @@ async function run() {
             res.send(result)
         })
 
+        app.get('/lessons/new', verifyFBToken, verifyAdmin, async (req, res) => {
+            const query = {};
+            const cursor = lessonsCollections.find(query).sort({ createdDate: -1 }).limit(6);
+            const result = await cursor.toArray();
+            res.send(result);
+        })
+
         app.get('/lessons/:id', verifyFBToken, async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) }
@@ -475,7 +482,7 @@ async function run() {
             }
         })
 
-        
+
         // payment related apis
         app.post('/create-checkout-session', async (req, res) => {
 
