@@ -464,7 +464,7 @@ async function run() {
                 }
 
                 const reportDoc = {
-                    lessonId: lessonId,
+                    lessonId: new ObjectId(lessonId),
                     reporterUserId: reporterUserId,
                     reporterEmail: reporterEmail || null,
                     reason,
@@ -481,6 +481,47 @@ async function run() {
                 res.status(500).send({ message: 'Internal server error' });
             }
         })
+
+
+        // reported lessons
+        app.get('/reported-lessons', async (req, res) => {
+            const result = await lessonsReportsCollection.aggregate([
+                {
+                    $group: {
+                        _id: '$lessonId',
+                        reportCount: { $sum: 1 },
+                        reports: {
+                            $push: {
+                                reporterEmail: '$reporterEmail',
+                                reporterUserId: '$reporterUserId',
+                                reason: '$reason',
+                                createdAt: '$createdAt'
+                            }
+                        }
+                    }
+                },
+                {
+                    $lookup: {
+                        from: 'lessons',
+                        localField: '_id',
+                        foreignField: '_id',
+                        as: 'lesson'
+                    }
+                },
+                { $unwind: '$lesson' },
+                {
+                    $project: {
+                        lessonId: '$_id',
+                        lessonTitle: '$lesson.lessonTitle',
+                        reportCount: 1,
+                        reports: 1
+                    }
+                }
+            ]).toArray();
+
+            res.send(result);
+        });
+
 
 
         // payment related apis
